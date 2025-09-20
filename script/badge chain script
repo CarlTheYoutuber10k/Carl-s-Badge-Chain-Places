@@ -1,0 +1,99 @@
+local BS = game:GetService("BadgeService")
+local TPS = game:GetService("TeleportService")
+local HttpS = game:GetService("HttpService")
+
+---------------------  -- SIDE NOTE: For this to work, you must put everything into the StarterGUI Folder!
+firstplayer = nil
+gamelist = {106018988205117,138208284912147,85782692451950,96022583841027,123082036272509,99069308373765,127996951471123,101327911535741,138973218820768,75324511865183,90176713347007,134750697993089,140637828444197,96358611015583,73684828372487,114564993048994,105082443224515,77831068125553,101094352265753,134474911309533,128461744349542,136289042760190,117348988818545,77222590903550,74127923603233,95454023535882,106556172879966,87050203702355,139707356450935,94882989955796,117047583748054,90183108541491,125901673053647,127272116517765,134040932623496,127337073324078,135749493863725,76942423252073,122324391673687,134323408399323,80732191761032,126282634179950,138568074770545,135522744192961,133773954933430,130992882984562,81297275654526,120665537949328,118594924206242,94147353329040,140329044251120,94939878506299,76212266928016,113756595413226,99784830962436,105807932009733,122855997694514,140470385883620,99309602114990,106624982707427,127136111865868,110663684919092,109034037997353,99387973162382,88619031575092,70568430583161,119719560540400,92561145506707,129722945085246,85375201055594,71425110364366,88407849001424,86639528747657,123849629449058,104274051123111} -- Insert Game IDs here! You can add as many places as you want!
+---------------------
+
+badge = {0} -- Insert Badge ID here!
+            -- You only need to put the Badge ID for the first badge of the game you are using this script in!
+            -- Once done, the script will go down the list of badges for the game, and award them directly to the player!
+local c = ""
+local stop = false
+while stop == false do
+	local m = HttpS:JSONDecode(HttpS:GetAsync("https://badges.roproxy.com/v1/universes/" .. game.GameId .. "/badges?limit=100&cursor=" .. c .. "&sortOrder=Asc"))
+	for q=1,#m.data do
+		table.insert(badge,m.data[q].id)
+	end
+	if m.nextPageCursor == nil then
+		stop = true
+	else
+		c = m.nextPageCursor
+	end
+end
+print(badge)
+
+--------------------
+
+function checkbadges(player, badgelist)
+	local templist = table.clone(badgelist)
+	for i=1,math.floor(#templist/100)+1 do
+		local firsthundredbadges = {}
+		local success,errorr = pcall(function() for i=1,100 do table.insert(firsthundredbadges, templist[i]) end end)
+		print(success)
+		local stroffirst = ""
+		for _,h in pairs(firsthundredbadges) do stroffirst = stroffirst..", "..h end
+
+		local m = HttpS:JSONDecode(HttpS:GetAsync("https://badges.roproxy.com/v1/users/"..player.UserId.."/badges/awarded-dates?badgeIds="..stroffirst))
+		for q=1,#m.data do
+			table.remove(templist, table.find(templist, m.data[q].badgeId))
+		end
+
+		print(templist)
+	end
+	return templist
+end
+
+function main(player)
+	if firstplayer ~= nil and firstplayer ~= player then
+		TPS:Teleport(gamelist[table.find(gamelist, game.PlaceId)-1], player)
+	elseif firstplayer == nil then
+		firstplayer = player
+
+		local guiText = script.ScreenGui:Clone()
+		guiText.Parent = player.PlayerGui
+		guiText = guiText:WaitForChild("TextLabel")
+		
+		guiText.Text = "Loading..."
+		local badges = checkbadges(player, badge)
+		if #badges < 80 then
+			local success,errorr = pcall(function() for badge=1,80 do 
+					BS:AwardBadge(player.UserId, badges[badge]) 
+					guiText.Text = "Awarding badges ("..badge.."/"..#badges..")"
+				end end)
+			print(success)
+			guiText.Text = "Teleporting ["..table.find(gamelist, game.PlaceId)+1 .."/"..#gamelist.."] ("..gamelist[table.find(gamelist, game.PlaceId)+1]..")"
+			repeat
+				TPS:Teleport(gamelist[table.find(gamelist, game.PlaceId)+1], player)
+				wait(15)
+			until player == nil
+		else
+			local success,errorr = pcall(function() for badge=1,80 do 
+					BS:AwardBadge(player.UserId, badges[badge]) 
+					guiText.Text = "Awarding badges ("..badge.."/"..#badges..")"
+			end end)
+			print(success)
+
+			guiText.Text = "Rejoining."
+			repeat
+				TPS:Teleport(game.PlaceId, player)
+				wait(15)
+			until player == nil
+		end
+	end
+end
+
+--------------------
+
+game.Players.PlayerAdded:Connect(function(player)
+	main(player)
+
+end)
+
+wait(2)
+
+for _,player in pairs(game.Players:GetChildren()) do
+	main(player)
+end
